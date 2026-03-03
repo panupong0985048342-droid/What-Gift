@@ -5,290 +5,136 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gifts Gachapon</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --primary-red: #e63946;
-            --gold: #ffb703;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #f0f2f5;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        h1 { color: var(--primary-red); margin: 20px 0; }
-
-        /* 扭蛋机容器 */
-        #gacha-container {
-            position: relative;
-            width: 400px;
-            height: 600px;
-            background: transparent;
-        }
-
-        /* 扭蛋机外壳视觉补完 */
-        .machine-body {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 250px;
-            background: var(--primary-red);
-            border-radius: 20px 20px 10px 10px;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        /* 物理渲染画布 */
-        #physics-canvas {
-            background: rgba(255, 255, 255, 0.8);
-            border: 8px solid #333;
-            border-radius: 200px 200px 50px 50px;
-            overflow: hidden;
-        }
-
-        /* 控制按钮 */
-        .controls {
-            margin-top: 20px;
-            display: flex;
-            gap: 15px;
-            z-index: 20;
-        }
-        button {
-            padding: 12px 25px;
-            font-size: 18px;
-            cursor: pointer;
-            border: none;
-            border-radius: 30px;
-            background: var(--gold);
-            color: #333;
-            font-weight: bold;
-            transition: transform 0.2s;
-        }
-        button:hover { transform: scale(1.05); }
-        button:active { transform: scale(0.95); }
-
-        /* 输入面板 */
-        #setup-panel {
-            width: 90%;
-            max-width: 500px;
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-top: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-        textarea {
-            width: 100%;
-            height: 80px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-
-        /* 结果弹窗 */
-        #result-modal {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            z-index: 100;
-            text-align: center;
-        }
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 99;
-        }
+        /* 样式保持不变，略作优化 */
+        :root { --primary-red: #e63946; --gold: #ffb703; }
+        body { margin: 0; display: flex; flex-direction: column; align-items: center; background-color: #fff5f5; font-family: sans-serif; }
+        #gacha-container { position: relative; width: 380px; height: 550px; margin-top: 15px; }
+        #physics-canvas { background: rgba(255,255,255,0.7); border: 8px solid #333; border-radius: 190px 190px 40px 40px; overflow: hidden; }
+        .machine-body { position: absolute; bottom: 0; width: 100%; height: 200px; background: var(--primary-red); border-radius: 20px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+        .panel { width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 15px; margin-top: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 2px solid var(--primary-red); }
+        button { padding: 12px 20px; border-radius: 25px; border: none; background: var(--gold); font-weight: bold; cursor: pointer; }
+        input, textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px; box-sizing: border-box; margin: 5px 0; }
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: white; padding: 40px; border-radius: 25px; z-index: 100; text-align: center; border: 5px solid var(--gold); }
+        .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99; }
     </style>
 </head>
 <body>
 
-    <h1>Gifts Gachapon</h1>
+    <h1>🎁 Gifts Gachapon</h1>
+
+    <div class="panel">
+        <input type="text" id="access-code" placeholder="输入暗号 (如: LOVE1)">
+        <button onclick="loadData()" style="width:100%; margin-top:8px;">开启扭蛋机</button>
+    </div>
 
     <div id="gacha-container">
         <div id="physics-canvas"></div>
-        
         <div class="machine-body">
-            <div style="margin-top: 40px;">
-                <select id="pool-selector">
-                    <option value="both">All Mixed (50/50)</option>
-                    <option value="big">Only Big Gifts 🎁</option>
-                    <option value="tiny">Only Tiny Gifts ✨</option>
-                </select>
-            </div>
-            <div class="controls">
-                <button onclick="spin()">扭一下！</button>
-            </div>
+            <select id="pool-selector" style="margin-top:30px; padding:5px;">
+                <option value="both">随机全池</option>
+                <option value="big">Big Gifts 🎁</option>
+                <option value="tiny">Tiny Gifts ✨</option>
+            </select>
+            <button onclick="spin()" style="margin-top:20px; font-size: 20px; width: 150px;">扭一下！</button>
         </div>
     </div>
 
-    <div id="setup-panel">
-        <h3>配置你的扭蛋机 (User 1)</h3>
-        <p><small>输入礼物内容，用中文逗号或换行分隔</small></p>
-        <label>🎁 Big Gifts:</label>
-        <textarea id="big-input" placeholder="例如：新款手机, 旅游机票, 奢侈品包包"></textarea>
-        <label>✨ Tiny Gifts:</label>
-        <textarea id="tiny-input" placeholder="例如：请喝奶茶, 帮洗一次碗, 抱抱卡"></textarea>
-        <button onclick="generateLink()" style="width: 100%; background: var(--primary-red); color: white;">生成分享链接</button>
-        <p id="share-url" style="word-break: break-all; color: blue; font-size: 12px;"></p>
+    <div class="panel">
+        <h3>设置暗号 & 礼物</h3>
+        <input type="text" id="set-code" placeholder="设置你的唯一暗号">
+        <textarea id="big-input" placeholder="Big Gifts (用逗号隔开)"></textarea>
+        <textarea id="tiny-input" placeholder="Tiny Gifts (用逗号隔开)"></textarea>
+        <button onclick="saveData()" style="width:100%; background: var(--primary-red); color:white;">保存扭蛋池</button>
     </div>
 
     <div class="overlay" id="overlay"></div>
-    <div id="result-modal">
-        <h2 id="gift-type">恭喜抽中！</h2>
-        <div id="capsule-visual" style="width: 80px; height: 80px; margin: 10px auto; border-radius: 50%; border: 4px solid #333;"></div>
-        <h1 id="gift-name" style="color: var(--primary-red);">---</h1>
-        <button onclick="closeModal()">收下啦</button>
+    <div id="modal">
+        <h2 id="res-type">获得礼物：</h2>
+        <h1 id="res-name" style="color: var(--primary-red); font-size: 36px;">---</h1>
+        <button onclick="closeModal()">好耶！</button>
     </div>
 
     <script>
-        const { Engine, Render, Runner, Bodies, Composite, Mouse, MouseConstraint, Vector } = Matter;
+        // --- 替换为你的 Supabase 信息 ---
+        const supabaseUrl = 'https://qqefpwqmdrhwyitlpudr.supabase.co';
+        const supabaseKey = 'sb_publishable_91mZYcEwua1ssY47mXAO3g_mNiBV7hW';
+        const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-        // --- 1. 初始化引擎 ---
+        // 物理引擎初始化 (保持不变)
+        const { Engine, Render, Runner, Bodies, Composite } = Matter;
         const engine = Engine.create();
-        const render = Render.create({
-            element: document.getElementById('physics-canvas'),
-            engine: engine,
-            options: {
-                width: 384,
-                height: 400,
-                wireframes: false, // 设置为 false 才能显示颜色
-                background: 'transparent'
+        const render = Render.create({ element: document.getElementById('physics-canvas'), engine: engine, options: { width: 360, height: 350, wireframes: false, background: 'transparent' } });
+        
+        let giftPool = { big: [], tiny: [] };
+        let balls = [];
+
+        function initMachine() {
+            Composite.add(engine.world, [
+                Bodies.rectangle(180, 360, 400, 20, { isStatic: true, render: { visible: false } }),
+                Bodies.rectangle(-10, 150, 20, 400, { isStatic: true }),
+                Bodies.rectangle(370, 150, 20, 400, { isStatic: true })
+            ]);
+            const colors = ['#e63946', '#ffb703', '#a8dadc', '#457b9d'];
+            for(let i=0; i<30; i++) {
+                const b = Bodies.circle(Math.random()*300+30, Math.random()*200, 18, { restitution: 0.5, render: { fillStyle: colors[i%4], strokeStyle: '#fff', lineWidth: 4 } });
+                balls.push(b);
             }
-        });
+            Composite.add(engine.world, balls);
+            Render.run(render);
+            Runner.run(Runner.create(), engine);
+        }
+        initMachine();
 
-        // --- 2. 创建扭蛋机边界 ---
-        const wallOptions = { isStatic: true, render: { visible: false } };
-        Composite.add(engine.world, [
-            Bodies.rectangle(192, 410, 400, 20, wallOptions), // 底
-            Bodies.rectangle(-10, 200, 20, 400, wallOptions), // 左
-            Bodies.rectangle(394, 200, 20, 400, wallOptions), // 右
-            // 顶部圆弧效果由多个小矩形组成模拟
-        ]);
+        // --- 数据交互：保存 ---
+        async function saveData() {
+            const code = document.getElementById('set-code').value.trim();
+            const big = document.getElementById('big-input').value.split(/[,，\n]/).filter(v => v.trim());
+            const tiny = document.getElementById('tiny-input').value.split(/[,，\n]/).filter(v => v.trim());
 
-        // --- 3. 解析 URL 数据 ---
-        let giftData = { big: [], tiny: [] };
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('data')) {
-            try {
-                giftData = JSON.parse(atob(urlParams.get('data')));
-                document.getElementById('setup-panel').style.display = 'none'; // 如果是访问链接，隐藏配置项
-            } catch (e) {
-                console.error("Data parse error");
+            if(!code) return alert("暗号不能为空！");
+
+            const { error } = await _supabase.from('gacha_data').upsert({ code: code, content: { big, tiny } });
+
+            if (error) alert("保存失败: " + error.message);
+            else alert(`保存成功！快去告诉他暗号：${code}`);
+        }
+
+        // --- 数据交互：提取 ---
+        async function loadData() {
+            const code = document.getElementById('access-code').value.trim();
+            const { data, error } = await _supabase.from('gacha_data').select('content').eq('code', code).single();
+
+            if (data) {
+                giftPool = data.content;
+                alert("已成功加载礼物池！可以开始扭蛋了。");
+            } else {
+                alert("没找到这个暗号，再检查下？");
             }
         }
 
-        // --- 4. 填充扭蛋 ---
-        const capsules = [];
-        const colors = ['#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93', '#FF924C'];
-
-        function createCapsules() {
-            const count = 25; // 视觉上显示的球数
-            for (let i = 0; i < count; i++) {
-                const color = colors[i % colors.length];
-                const x = Math.random() * 300 + 40;
-                const y = Math.random() * 200 + 50;
-                
-                // 自定义渲染：半圆色块
-                const ball = Bodies.circle(x, y, 22, {
-                    restitution: 0.6,
-                    friction: 0.1,
-                    render: {
-                        sprite: {
-                            // 这里可以通过 canvas 动态生成贴图，简单起见直接用颜色
-                        },
-                        fillStyle: color,
-                        strokeStyle: '#fff',
-                        lineWidth: 10
-                    }
-                });
-                capsules.push(ball);
-            }
-            Composite.add(engine.world, capsules);
-        }
-        createCapsules();
-
-        // --- 5. 核心逻辑：扭一下 ---
         function spin() {
-            // 检查池子是否有东西
-            const poolType = document.getElementById('pool-selector').value;
-            let currentPool = [];
+            if(giftPool.big.length === 0 && giftPool.tiny.length === 0) return alert("请先输入暗号加载内容");
             
-            if (poolType === 'big') currentPool = giftData.big;
-            else if (poolType === 'tiny') currentPool = giftData.tiny;
-            else currentPool = [...giftData.big, ...giftData.tiny];
+            balls.forEach(b => Matter.Body.applyForce(b, b.position, { x: (Math.random()-0.5)*0.05, y: -Math.random()*0.12 }));
 
-            if (currentPool.length === 0) {
-                alert("扭蛋机里是空的哦！请User 1先填入礼物内容。");
-                return;
-            }
-
-            // 1. 物理层：施加随机力实现无序乱飞
-            capsules.forEach(ball => {
-                const forceMagnitude = 0.05 * ball.mass;
-                Matter.Body.applyForce(ball, ball.position, {
-                    x: (Math.random() - 0.5) * forceMagnitude * 2,
-                    y: -Math.random() * forceMagnitude * 5
-                });
-            });
-
-            // 2. 动画延迟后显示结果
             setTimeout(() => {
-                const randomIndex = Math.floor(Math.random() * currentPool.length);
-                const result = currentPool[randomIndex];
-                showResult(result, poolType);
-            }, 1500);
-        }
-
-        function showResult(name, type) {
-            document.getElementById('gift-name').innerText = name;
-            document.getElementById('gift-type').innerText = "你抽中了：";
-            document.getElementById('overlay').style.display = 'block';
-            document.getElementById('result-modal').style.display = 'block';
-            
-            // 随机个颜色给视觉效果
-            const randomCol = colors[Math.floor(Math.random()*colors.length)];
-            document.getElementById('capsule-visual').style.background = `linear-gradient(to bottom, ${randomCol} 50%, #fff 50%)`;
+                const type = document.getElementById('pool-selector').value;
+                let finalPool = type === 'both' ? [...giftPool.big, ...giftPool.tiny] : giftPool[type];
+                if (finalPool.length === 0) finalPool = ["空空的扭蛋机..."];
+                
+                const prize = finalPool[Math.floor(Math.random()*finalPool.length)];
+                document.getElementById('res-name').innerText = prize;
+                document.getElementById('overlay').style.display = 'block';
+                document.getElementById('modal').style.display = 'block';
+            }, 1200);
         }
 
         function closeModal() {
             document.getElementById('overlay').style.display = 'none';
-            document.getElementById('result-modal').style.display = 'none';
+            document.getElementById('modal').style.display = 'none';
         }
-
-        // --- 6. 数据分享逻辑 ---
-        function generateLink() {
-            const bigVal = document.getElementById('big-input').value.split(/[,，\n]/).filter(i => i.trim());
-            const tinyVal = document.getElementById('tiny-input').value.split(/[,，\n]/).filter(i => i.trim());
-            
-            const data = { big: bigVal, tiny: tinyVal };
-            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-            const url = window.location.origin + window.location.pathname + '?data=' + encoded;
-            
-            document.getElementById('share-url').innerHTML = `生成的链接（复制发给TA）：<br><a href="${url}">${url}</a>`;
-            alert("链接已生成，请向下滚动页面复制链接发给你的男朋友！");
-        }
-
-        // 运行引擎
-        Render.run(render);
-        const runner = Runner.create();
-        Runner.run(runner, engine);
-
     </script>
 </body>
 </html>
